@@ -1,4 +1,5 @@
-
+.DS_store
+.idea/
 target/
 dbt_packages/
 logs/
