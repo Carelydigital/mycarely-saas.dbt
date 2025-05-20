@@ -125,7 +125,7 @@ combined_traffic AS (
         AND et.traffic_type = 'paid'
 )
 SELECT
-    nextval('campaign_spends_agg_id_seq') AS id,
+    nextval('public.campaign_spends_id_seq') AS id,
     company_id,
     company_domain,
     spend_date,
