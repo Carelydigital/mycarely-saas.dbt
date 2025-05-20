@@ -1,4 +1,4 @@
--- my_dbt_project/models/lead_activities_agg.sql
+-- models/lead_activities_agg.sql
 {{ config(
     materialized='incremental',
     schema='public',
@@ -11,7 +11,7 @@
 SELECT COUNT(*) AS lead_count
 FROM {{ source('public', 'lead_stage_change_events') }}
     {% if is_incremental() %}
-WHERE date::date > (SELECT COALESCE(MAX(activity_date), '1900-01-01') FROM {{ this }})
+WHERE date > (SELECT NVL(MAX(activity_date), '1900-01-01') FROM {{ this }})
     {% endif %}
     {% endset %}
     {% set lead_count_result = run_query(lead_count_query) %}
@@ -45,18 +45,22 @@ WITH filtered_events AS (
     ROW_NUMBER() OVER (
     PARTITION BY domain_userid
     ORDER BY
-    CASE WHEN (refr_medium IN ('cpc', 'ppc', 'paidsearch', 'display', 'social', 'search', 'email', '', 'unknown') AND COALESCE(mkt_network, '') != '')
-    OR (refr_medium = 'paid') THEN 1 ELSE 2 END,
+    CASE
+    WHEN (refr_medium IN ('cpc', 'ppc', 'paidsearch', 'display', 'social', 'search', 'email', '', 'unknown') AND NVL(mkt_network, '') <> '')
+    OR refr_medium = 'paid' THEN 1
+    ELSE 2
+    END,
     collector_tstamp DESC,
-    event_id::text DESC  -- Robust tiebreaker
+    event_id DESC
     ) AS rn
     FROM {{ source('atomic', 'events') }}
     WHERE event = 'page_view'
     AND useragent NOT ILIKE '%bot%'
     AND useragent NOT ILIKE '%spider%'
     AND useragent NOT ILIKE '%crawl%'
-    AND refr_medium != 'internal'
+    AND refr_medium <> 'internal'
     ),
+
     latest_events AS (
     SELECT
     domain_userid,
@@ -69,6 +73,7 @@ WITH filtered_events AS (
     FROM filtered_events
     WHERE rn = 1
     ),
+
     lead_activities AS (
     SELECT DISTINCT
     company_domain,
@@ -76,7 +81,7 @@ WITH filtered_events AS (
     domain_userid,
     lead_id,
     person_id,
-    date::date AS activity_date,
+    date AS activity_date,
     lead_generator_id,
     lead_generator_name,
     lead_source_ehr_id,
@@ -92,9 +97,10 @@ WITH filtered_events AS (
     product_sku
     FROM {{ source('public', 'lead_stage_change_events') }}
     {% if is_incremental() %}
-    WHERE date::date > (SELECT COALESCE(MAX(activity_date), '1900-01-01') FROM {{ this }})
+    WHERE date > (SELECT NVL(MAX(activity_date), '1900-01-01') FROM {{ this }})
     {% endif %}
     ),
+
     traffic_spend AS (
     SELECT DISTINCT
     spend_date,
@@ -107,6 +113,7 @@ WITH filtered_events AS (
     AND col_4 IS NOT NULL
     AND col_1 = 'unique'
     ),
+
     enriched_activities AS (
     SELECT
     la.company_id,
@@ -118,7 +125,7 @@ WITH filtered_events AS (
     LOWER(le.mkt_campaign) AS mkt_campaign,
     le.visit_date,
     LOWER(le.page_urlpath) AS page_urlpath,
-    COALESCE(ts.spend_per_visit, 0) AS mkt_spend,
+    NVL(ts.spend_per_visit, 0) AS mkt_spend,
     la.activity_date,
     la.lead_source_ehr_id,
     la.lead_generator_id,
@@ -132,7 +139,7 @@ WITH filtered_events AS (
     la.product_id,
     LOWER(la.product_sku) AS product_sku,
     LOWER(la.product_name) AS product_name,
-    LOWER(CAST(la.product_price AS TEXT)) AS product_price
+    CAST(la.product_price AS VARCHAR) AS product_price
     FROM lead_activities la
     LEFT JOIN latest_events le
     ON la.domain_userid = le.domain_userid
@@ -141,8 +148,11 @@ WITH filtered_events AS (
     AND le.visit_date = ts.spend_date
     AND ts.col_1 = 'unique'
     )
+
 SELECT
-    nextval('public_public.lead_activities_agg_id_seq') AS id,
+    {{ dbt_utils.generate_surrogate_key([
+    'company_id', 'domain_userid', 'event_id', 'activity_date', 'new_stage_id'
+    ]) }} AS id,
     company_id,
     company_name,
     domain_userid,
