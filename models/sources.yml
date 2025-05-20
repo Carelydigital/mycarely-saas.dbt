@@ -5,13 +5,13 @@ sources:
     schema: public
     tables:
       - name: campaign_spends
-      - name: lead_activities_agg
+      - name: lead_stage_change_events
   - name: public_public
     schema: public_public
     tables:
       - name: traffic_daily_agg
+      - name: lead_activities_agg
   - name: atomic
     schema: atomic
     tables:
       - name: events
-      - name: com_mycarely_lead_stage_change_2

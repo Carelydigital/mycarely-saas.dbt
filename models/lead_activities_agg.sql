@@ -9,7 +9,7 @@
 {% if execute %}
     {% set lead_count_query %}
 SELECT COUNT(*) AS lead_count
-FROM {{ source('atomic', 'com_mycarely_lead_stage_change_2') }}
+FROM {{ source('public', 'lead_stage_change_events') }}
     {% if is_incremental() %}
 WHERE date::date > (SELECT COALESCE(MAX(activity_date), '1900-01-01') FROM {{ this }})
     {% endif %}
@@ -90,7 +90,7 @@ WITH filtered_events AS (
     product_name,
     product_price,
     product_sku
-    FROM {{ source('atomic', 'com_mycarely_lead_stage_change_2') }}
+    FROM {{ source('public', 'lead_stage_change_events') }}
     {% if is_incremental() %}
     WHERE date::date > (SELECT COALESCE(MAX(activity_date), '1900-01-01') FROM {{ this }})
     {% endif %}
