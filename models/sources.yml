@@ -11,6 +11,7 @@ sources:
     tables:
       - name: traffic_daily_agg
       - name: lead_activities_agg
+      - name: traffic_pages_agg
   - name: atomic
     schema: atomic
     tables:
